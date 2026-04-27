@@ -230,12 +230,10 @@ if jq . >/dev/null 2>&1 <<<'{}'; then
   jq --argjson pw "$PW_LIST" --arg ip "$SERVER_IP" '
     .auth.mode = "passwords" |
     .auth.config = $pw |
-    .listen = ":5667" |
+    .listen = (."listen" // ":5667") |
     .cert = "/etc/zivpn/zivpn.crt" |
     .key  = "/etc/zivpn/zivpn.key" |
-    .obfs = "tls" |
-    .mux = true |
-    .mux_concurrency = 2 |
+    .obfs = (."obfs" // "zivpn") |
     .server = $ip
   ' "$CFG" > "$TMP" && mv "$TMP" "$CFG"
 fi
