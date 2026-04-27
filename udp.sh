@@ -234,7 +234,8 @@ if jq . >/dev/null 2>&1 <<<'{}'; then
     .cert = "/etc/zivpn/zivpn.crt" |
     .key  = "/etc/zivpn/zivpn.key" |
     .obfs = "tls" |
-    .mux = false |
+    .mux = true |
+    .mux_concurrency = 8 |
     .server = $ip
   ' "$CFG" > "$TMP" && mv "$TMP" "$CFG"
 fi
