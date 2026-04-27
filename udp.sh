@@ -230,10 +230,10 @@ if jq . >/dev/null 2>&1 <<<'{}'; then
   jq --argjson pw "$PW_LIST" --arg ip "$SERVER_IP" '
     .auth.mode = "passwords" |
     .auth.config = $pw |
-    .listen = (."listen" // ":5667") |
+    .listen = ":5667" |
     .cert = "/etc/zivpn/zivpn.crt" |
     .key  = "/etc/zivpn/zivpn.key" |
-    .obfs = (."obfs" // "zivpn") |
+    .obfs = "http_simple" |
     .server = $ip
   ' "$CFG" > "$TMP" && mv "$TMP" "$CFG"
 fi
@@ -1594,68 +1594,24 @@ Persistent=true
 WantedBy=timers.target
 EOF
 
-# ===== Networking Setup (Fixed for all VPS) =====
-echo -e "${Y}🌐 ZIVPN Network Setup (Fixed Version)${Z}"
-
-# 1. Enable IP forwarding
-echo 1 > /proc/sys/net/ipv4/ip_forward
+# ===== Networking Setup =====
+echo -e "${Y}🌐 Network Configuration ပြုလုပ်နေပါတယ်...${Z}"
 sysctl -w net.ipv4.ip_forward=1 >/dev/null
 grep -q '^net.ipv4.ip_forward=1' /etc/sysctl.conf || echo 'net.ipv4.ip_forward=1' >> /etc/sysctl.conf
 
-# 2. Get network interface
 IFACE=$(ip -4 route ls | awk '/default/ {print $5; exit}')
 [ -n "${IFACE:-}" ] || IFACE=eth0
-echo -e "${G}✅ Using network interface: $IFACE${Z}"
 
-# 3. Flush existing rules and set up fresh
+# DNAT Rules
 iptables -t nat -F
-iptables -t mangle -F
-iptables -F
-iptables -X
-
-# 4. Set default policies
-iptables -P INPUT ACCEPT
-iptables -P FORWARD ACCEPT
-iptables -P OUTPUT ACCEPT
-
-# 5. Allow established connections
-iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
-
-# 6. Main UDP redirect rule (ports 6000-19999 -> 5667)
-echo -e "${Y}   • Adding UDP redirect rule...${Z}"
 iptables -t nat -A PREROUTING -i "$IFACE" -p udp --dport 6000:19999 -j DNAT --to-destination :5667
 iptables -t nat -A PREROUTING -i "$IFACE" -p udp --dport 5667 -j DNAT --to-destination :5667
-echo -e "${G}      ✅ UDP redirect rule added${Z}"
-
-# 7. MASQUERADE for internet access
-echo -e "${Y}   • Adding MASQUERADE rule...${Z}"
 iptables -t nat -A POSTROUTING -o "$IFACE" -j MASQUERADE
-echo -e "${G}      ✅ MASQUERADE rule added${Z}"
 
-# 8. FORWARD rules for VPN traffic
-echo -e "${Y}   • Adding FORWARD rules...${Z}"
-iptables -A FORWARD -i "$IFACE" -o tun0 -j ACCEPT 2>/dev/null || true
-iptables -A FORWARD -i tun0 -o "$IFACE" -j ACCEPT 2>/dev/null || true
-iptables -A FORWARD -j ACCEPT
-echo -e "${G}      ✅ FORWARD rules added${Z}"
-
-# 9. Increase conntrack limits
-echo -e "${Y}   • Optimizing conntrack settings...${Z}"
-sysctl -w net.netfilter.nf_conntrack_max=524288 >/dev/null
-sysctl -w net.netfilter.nf_conntrack_tcp_timeout_established=86400 >/dev/null
-sysctl -w net.netfilter.nf_conntrack_udp_timeout=180 >/dev/null
-sysctl -w net.netfilter.nf_conntrack_udp_timeout_stream=180 >/dev/null
-echo -e "${G}      ✅ Conntrack settings optimized${Z}"
-
-# 10. Save rules
-if command -v iptables-save >/dev/null 2>&1; then
-    mkdir -p /etc/iptables
-    iptables-save > /etc/iptables/rules.v4 2>/dev/null
-    echo -e "${G}      ✅ Rules saved${Z}"
-fi
-
-echo -e "${G}✅ Network setup completed successfully${Z}"
-echo -e "${Y}📌 No firewall software was installed or modified${Z}"
+# UFW Rules
+ufw allow 1:65535/tcp >/dev/null 2>&1 || true
+ufw allow 1:65535/udp >/dev/null 2>&1 || true
+ufw --force enable >/dev/null 2>&1 || true
 
 # ===== Final Setup =====
 say "${Y}🔧 Final Configuration ပြုလုပ်နေပါတယ်...${Z}"
