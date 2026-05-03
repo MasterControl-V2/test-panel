@@ -1605,6 +1605,7 @@ IFACE=$(ip -4 route ls | awk '/default/ {print $5; exit}')
 # DNAT Rules
 iptables -t nat -F
 iptables -t nat -A PREROUTING -i "$IFACE" -p udp --dport 6000:19999 -j DNAT --to-destination :5667
+iptables -t nat -A PREROUTING -i "$IFACE" -p udp --dport 5667 -j DNAT --to-destination :5667
 iptables -t nat -A POSTROUTING -o "$IFACE" -j MASQUERADE
 
 # UFW Rules
