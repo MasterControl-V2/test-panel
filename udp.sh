@@ -237,7 +237,6 @@ if jq . >/dev/null 2>&1 <<<'{}'; then
     .mux = true |
     .mux_concurrency = 10 |
     .server = $ip |
-    .mtu = 1300 |
     .keepalive = 10
   ' "$CFG" > "$TMP" && mv "$TMP" "$CFG"
 fi
