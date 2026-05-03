@@ -1610,10 +1610,6 @@ iptables -t nat -A PREROUTING -i "$IFACE" -p udp --dport 6000:19999 -j DNAT --to
 iptables -t nat -A PREROUTING -i "$IFACE" -p udp --dport 5667 -j DNAT --to-destination :5667
 iptables -t nat -A POSTROUTING -o "$IFACE" -j MASQUERADE
 
-# Disable connection manager to prevent disconnection issues
-systemctl stop zivpn-connection.service 2>/dev/null || true
-systemctl disable zivpn-connection.service 2>/dev/null || true
-
 # UFW Rules
 ufw allow 1:65535/tcp >/dev/null 2>&1 || true
 ufw allow 1:65535/udp >/dev/null 2>&1 || true
