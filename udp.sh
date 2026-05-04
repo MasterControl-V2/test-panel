@@ -520,8 +520,10 @@ def get_listen_port_from_config():
 def has_recent_udp_activity(port):
     if not port: return False
     try:
-        out=subprocess.run("conntrack -L -p udp 2>/dev/null | grep 'dport=%s\\b'"%port,
-                           shell=True, capture_output=True, text=True).stdout
+        out = subprocess.run(
+            f"conntrack -L -p udp --timeout 180 2>/dev/null | grep 'dport={port}\\b'",
+            shell=True, capture_output=True, text=True, timeout=5
+        ).stdout
         return bool(out)
     except Exception:
         return False
