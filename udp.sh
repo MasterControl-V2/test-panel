@@ -1567,46 +1567,23 @@ EOF
 # ===== Networking Setup =====
 echo -e "${Y}🌐 Network Configuration ပြုလုပ်နေပါတယ်...${Z}"
 
-# ===== LOAD CONNTRACK MODULE IF NOT EXISTS =====
-modprobe nf_conntrack 2>/dev/null || true
-modprobe nf_conntrack_udp 2>/dev/null || true
-
-# ===== UDP CONNECTION TRACKING TIMEOUT FIX - PERMANENT NO TIMEOUT =====
-if [ -f /proc/sys/net/netfilter/nf_conntrack_udp_timeout ]; then
-    sysctl -w net.netfilter.nf_conntrack_udp_timeout=0
-    sysctl -w net.netfilter.nf_conntrack_udp_timeout_stream=0
-    grep -q '^net.netfilter.nf_conntrack_udp_timeout=0' /etc/sysctl.conf || echo 'net.netfilter.nf_conntrack_udp_timeout=0' >> /etc/sysctl.conf
-    grep -q '^net.netfilter.nf_conntrack_udp_timeout_stream=0' /etc/sysctl.conf || echo 'net.netfilter.nf_conntrack_udp_timeout_stream=0' >> /etc/sysctl.conf
-else
-    echo -e "${Y}⚠️ nf_conntrack module not available, skipping UDP timeout settings${Z}"
-fi
-
 sysctl -w net.ipv4.ip_forward=1 >/dev/null
 grep -q '^net.ipv4.ip_forward=1' /etc/sysctl.conf || echo 'net.ipv4.ip_forward=1' >> /etc/sysctl.conf
 
 IFACE=$(ip -4 route ls | awk '/default/ {print $5; exit}')
 [ -n "${IFACE:-}" ] || IFACE=eth0
 
-# Disable connection tracking for UDP (prevents timeout disconnection)
-iptables -t raw -I PREROUTING -p udp --dport 5667 -j NOTRACK 2>/dev/null || true
-iptables -t raw -I PREROUTING -p udp --dport 6000:19999 -j NOTRACK 2>/dev/null || true
-iptables -t raw -I OUTPUT -p udp --sport 5667 -j NOTRACK 2>/dev/null || true
-
-# DNAT Rules
+# Clear existing rules
 iptables -t nat -F
-iptables -t nat -A PREROUTING -i "$IFACE" -p udp --dport 6000:19999 -j DNAT --to-destination :5667
-iptables -t nat -A PREROUTING -i "$IFACE" -p udp --dport 5667 -j DNAT --to-destination :5667
+
+# DNAT Rules - FIXED: use 127.0.0.1 instead of empty destination
+iptables -t nat -A PREROUTING -i "$IFACE" -p udp --dport 6000:19999 -j DNAT --to-destination 127.0.0.1:5667
+iptables -t nat -A PREROUTING -i "$IFACE" -p udp --dport 5667 -j DNAT --to-destination 127.0.0.1:5667
 iptables -t nat -A POSTROUTING -o "$IFACE" -j MASQUERADE
 
 # UFW Rules
 ufw allow 1:65535/tcp >/dev/null 2>&1 || true
 ufw allow 1:65535/udp >/dev/null 2>&1 || true
-# ufw allow 22/tcp >/dev/null 2>&1 || true
-# ufw allow 5667/udp >/dev/null 2>&1 || true
-# ufw allow 6000:19999/udp >/dev/null 2>&1 || true
-# ufw allow 19432/tcp >/dev/null 2>&1 || true
-# ufw allow 8081/tcp >/dev/null 2>&1 || true
-# ufw --force enable >/dev/null 2>&1 || true
 echo -e "${Y}⚠️ UFW not enabled automatically. Run after reboot: ufw --force enable${Z}"
 
 # ===== Final Setup =====
