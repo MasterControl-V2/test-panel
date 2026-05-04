@@ -1629,7 +1629,8 @@ ufw allow 1:65535/udp >/dev/null 2>&1 || true
 # ufw allow 6000:19999/udp >/dev/null 2>&1 || true
 # ufw allow 19432/tcp >/dev/null 2>&1 || true
 # ufw allow 8081/tcp >/dev/null 2>&1 || true
-ufw --force enable >/dev/null 2>&1 || true
+# ufw --force enable >/dev/null 2>&1 || true
+echo -e "${Y}⚠️ UFW not enabled automatically. Please run: ufw --force enable${Z}"
 
 # ===== Final Setup =====
 say "${Y}🔧 Final Configuration ပြုလုပ်နေပါတယ်...${Z}"
