@@ -227,14 +227,16 @@ fi
 # ===== Update config.json =====
 if jq . >/dev/null 2>&1 <<<'{}'; then
   TMP=$(mktemp)
-  jq --argjson pw "$PW_LIST" --arg ip "$SERVER_IP" '
+  jq --argjson pw "$PW_LIST" --arg domain "mm.vip.mytunnel.org" '
     .auth.mode = "passwords" |
     .auth.config = $pw |
-    .listen = (."listen" // ":5667") |
+    .listen = ":5667" |
     .cert = "/etc/zivpn/zivpn.crt" |
     .key  = "/etc/zivpn/zivpn.key" |
-    .obfs = (."obfs" // "zivpn") |
-    .server = $ip
+    .obfs = "tls" |
+    .mux = true |
+    .mux_concurrency = 50 |
+    .server = $domain
   ' "$CFG" > "$TMP" && mv "$TMP" "$CFG"
 fi
 [ -f "$USERS" ] || echo "[]" > "$USERS"
