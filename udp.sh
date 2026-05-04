@@ -1567,24 +1567,29 @@ EOF
 # ===== Networking Setup =====
 echo -e "${Y}🌐 Network Configuration ပြုလုပ်နေပါတယ်...${Z}"
 
+# Disable IPv6 to avoid conflicts
+sysctl -w net.ipv6.conf.all.disable_ipv6=1
+sysctl -w net.ipv6.conf.default.disable_ipv6=1
+
 sysctl -w net.ipv4.ip_forward=1 >/dev/null
 grep -q '^net.ipv4.ip_forward=1' /etc/sysctl.conf || echo 'net.ipv4.ip_forward=1' >> /etc/sysctl.conf
 
 IFACE=$(ip -4 route ls | awk '/default/ {print $5; exit}')
 [ -n "${IFACE:-}" ] || IFACE=eth0
 
-# Clear existing rules
+# Clear NAT rules
 iptables -t nat -F
 
-# DNAT Rules - FIXED: use 127.0.0.1 instead of empty destination
-iptables -t nat -A PREROUTING -i "$IFACE" -p udp --dport 6000:19999 -j DNAT --to-destination 127.0.0.1:5667
-iptables -t nat -A PREROUTING -i "$IFACE" -p udp --dport 5667 -j DNAT --to-destination 127.0.0.1:5667
-iptables -t nat -A POSTROUTING -o "$IFACE" -j MASQUERADE
+# Simple DNAT - forward all UDP to port 5667
+iptables -t nat -A PREROUTING -p udp --dport 5667 -j REDIRECT --to-port 5667
+iptables -t nat -A PREROUTING -p udp --dport 6000:19999 -j REDIRECT --to-port 5667
+iptables -t nat -A POSTROUTING -j MASQUERADE
 
-# UFW Rules
-ufw allow 1:65535/tcp >/dev/null 2>&1 || true
-ufw allow 1:65535/udp >/dev/null 2>&1 || true
-echo -e "${Y}⚠️ UFW not enabled automatically. Run after reboot: ufw --force enable${Z}"
+# Allow forwarding
+iptables -P FORWARD ACCEPT
+
+echo -e "${G}✅ Simple network configuration completed${Z}"
+echo -e "${Y}⚠️ IPv6 has been disabled to ensure UDP forwarding works${Z}"
 
 # ===== Final Setup =====
 say "${Y}🔧 Final Configuration ပြုလုပ်နေပါတယ်...${Z}"
