@@ -1360,45 +1360,10 @@ class ConnectionManager:
             return {}
             
     def enforce_connection_limits(self):
-        """Enforce connection limits for all users"""
-        db = self.get_db()
-        try:
-            # Get all active users with their connection limits
-            users = db.execute('''
-                SELECT username, concurrent_conn, port 
-                FROM users 
-                WHERE status = "active" AND (expires IS NULL OR expires >= CURRENT_DATE)
-            ''').fetchall()
-            
-            active_connections = self.get_active_connections()
-            
-            for user in users:
-                username = user['username']
-                max_connections = user['concurrent_conn']
-                user_port = str(user['port'] or '5667')
-                
-                # Count connections for this user (by port)
-                user_conn_count = 0
-                user_connections = []
-                
-                for conn_key in active_connections:
-                    if conn_key.endswith(f":{user_port}"):
-                        user_conn_count += 1
-                        user_connections.append(conn_key)
-                
-                # If over limit, drop oldest connections
-                if user_conn_count > max_connections:
-                    print(f"User {username} has {user_conn_count} connections (limit: {max_connections})")
-                    
-                    # Drop excess connections (FIFO - we'll drop the first ones we find)
-                    excess = user_conn_count - max_connections
-                    for i in range(excess):
-                        if i < len(user_connections):
-                            conn_to_drop = user_connections[i]
-                            self.drop_connection(conn_to_drop)
-                            
-        finally:
-            db.close()
+        """Enforce connection limits for all users - DISABLED for permanent connection"""
+        # DISABLED: This function is intentionally left empty to prevent automatic disconnection
+        # Users can have unlimited connection time without being forcefully disconnected
+        pass
             
     def drop_connection(self, connection_key):
         """Drop a specific connection using conntrack"""
@@ -1414,15 +1379,16 @@ class ConnectionManager:
             print(f"Error dropping connection {connection_key}: {e}")
             
     def start_monitoring(self):
-        """Start the connection monitoring loop"""
+        """Start the connection monitoring loop - DISABLED for permanent connection"""
         def monitor_loop():
             while True:
                 try:
-                    self.enforce_connection_limits()
-                    time.sleep(60)  # Check every 60 seconds for UDP stability
+                    # DISABLED: Do NOT enforce connection limits to keep sessions alive forever
+                    # self.enforce_connection_limits()
+                    time.sleep(300)  # Only health check every 5 minutes, no action taken
                 except Exception as e:
                     print(f"Monitoring error: {e}")
-                    time.sleep(120)
+                    time.sleep(300)
                     
         monitor_thread = threading.Thread(target=monitor_loop, daemon=True)
         monitor_thread.start()
@@ -1431,7 +1397,7 @@ class ConnectionManager:
 connection_manager = ConnectionManager()
 
 if __name__ == "__main__":
-    print("Starting Connection Manager...")
+    print("Starting Connection Manager (Connection limits DISABLED for permanent sessions)...")
     connection_manager.start_monitoring()
     try:
         while True:
