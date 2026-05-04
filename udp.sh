@@ -1185,94 +1185,103 @@ if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8081)
 PY
 
-# ===== Daily Cleanup Script =====
-say "${Y}🧹 Daily Cleanup Service ထည့်သွင်းနေပါတယ်...${Z}"
-cat >/etc/zivpn/cleanup.py <<'PY'
+# ===== Connection Manager =====
+say "${Y}🔗 Connection Manager ထည့်သွင်းနေပါတယ်...${Z}"
+cat >/etc/zivpn/connection_manager.py <<'PY'
 import sqlite3
-import datetime
-import os
 import subprocess
-import json
-import tempfile
+import time
+import threading
+from datetime import datetime
+import os
 
 DATABASE_PATH = "/etc/zivpn/zivpn.db"
-CONFIG_FILE = "/etc/zivpn/config.json"
 
-def get_db():
-    conn = sqlite3.connect(DATABASE_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
-
-def read_json(path, default):
-    try:
-        with open(path,"r") as f: return json.load(f)
-    except Exception:
-        return default
-
-def write_json_atomic(path, data):
-    d=json.dumps(data, ensure_ascii=False, indent=2)
-    dirn=os.path.dirname(path); fd,tmp=tempfile.mkstemp(prefix=".tmp-", dir=dirn)
-    try:
-        with os.fdopen(fd,"w") as f: f.write(d)
-        os.replace(tmp,path)
-    finally:
-        try: os.remove(tmp)
-        except: pass
-
-def sync_config_passwords():
-    # Only sync passwords for non-suspended/non-expired users
-    db = get_db()
-    active_users = db.execute('''
-        SELECT password FROM users 
-        WHERE status = "active" AND password IS NOT NULL AND password != "" 
-              AND (expires IS NULL OR expires >= CURRENT_DATE)
-    ''').fetchall()
-    db.close()
-    
-    users_pw = sorted({str(u["password"]) for u in active_users})
-    
-    cfg=read_json(CONFIG_FILE,{})
-    if not isinstance(cfg.get("auth"),dict): cfg["auth"]={}
-    cfg["auth"]["mode"]="passwords"
-    cfg["auth"]["config"]=users_pw
-    
-    write_json_atomic(CONFIG_FILE,cfg)
-    subprocess.run("systemctl restart zivpn.service", shell=True)
-
-def daily_cleanup():
-    db = get_db()
-    today = datetime.datetime.now().date().strftime("%Y-%m-%d")
-    suspended_count = 0
-    
-    try:
-        # 1. Auto-suspend expired users
-        expired_users = db.execute('''
-            SELECT username, expires, status FROM users
-            WHERE status = 'active' AND expires < ?
-        ''', (today,)).fetchall()
+class ConnectionManager:
+    def __init__(self):
+        self.connection_tracker = {}
+        self.lock = threading.Lock()
         
-        for user in expired_users:
-            db.execute('UPDATE users SET status = "suspended" WHERE username = ?', (user['username'],))
-            suspended_count += 1
-            print(f"User {user['username']} expired on {user['expires']} and was suspended.")
+    def get_db(self):
+        conn = sqlite3.connect(DATABASE_PATH)
+        conn.row_factory = sqlite3.Row
+        return conn
+        
+    def get_active_connections(self):
+        """Get active connections using conntrack"""
+        try:
+            result = subprocess.run(
+                "conntrack -L -p udp 2>/dev/null | grep -E 'dport=(5667|[6-9][0-9]{3}|[1-9][0-9]{4})' | awk '{print $7,$8}'",
+                shell=True, capture_output=True, text=True
+            )
             
-        db.commit()
+            connections = {}
+            for line in result.stdout.split('\n'):
+                if 'src=' in line and 'dport=' in line:
+                    try:
+                        parts = line.split()
+                        src_ip = None
+                        dport = None
+                        
+                        for part in parts:
+                            if part.startswith('src='):
+                                src_ip = part.split('=')[1]
+                            elif part.startswith('dport='):
+                                dport = part.split('=')[1]
+                        
+                        if src_ip and dport:
+                            connections[f"{src_ip}:{dport}"] = True
+                    except:
+                        continue
+            return connections
+        except:
+            return {}
+            
+    def enforce_connection_limits(self):
+        """Enforce connection limits for all users - DISABLED for permanent connection"""
+        # DISABLED: This function is intentionally left empty to prevent automatic disconnection
+        # Users can have unlimited connection time without being forcefully disconnected
+        pass
+            
+    def drop_connection(self, connection_key):
+        """Drop a specific connection using conntrack"""
+        try:
+            # connection_key format: "IP:PORT"
+            ip, port = connection_key.split(':')
+            subprocess.run(
+                f"conntrack -D -p udp --dport {port} --src {ip}",
+                shell=True, capture_output=True
+            )
+            print(f"Dropped connection: {connection_key}")
+        except Exception as e:
+            print(f"Error dropping connection {connection_key}: {e}")
+            
+    def start_monitoring(self):
+        """Start the connection monitoring loop - DISABLED for permanent connection"""
+        def monitor_loop():
+            while True:
+                try:
+                    # DISABLED: Do NOT enforce connection limits to keep sessions alive forever
+                    # self.enforce_connection_limits()
+                    time.sleep(300)  # Only health check every 5 minutes, no action taken
+                except Exception as e:
+                    print(f"Monitoring error: {e}")
+                    time.sleep(300)
+                    
+        monitor_thread = threading.Thread(target=monitor_loop, daemon=True)
+        monitor_thread.start()
+        
+# Global instance
+connection_manager = ConnectionManager()
 
-        # 2. Re-sync passwords to exclude the newly suspended users
-        if suspended_count > 0:
-            print(f"Total {suspended_count} users suspended. Restarting ZIVPN service...")
-            sync_config_passwords()
-        
-        print(f"Cleanup finished. {suspended_count} users suspended today.")
-        
-    except Exception as e:
-        print(f"An error occurred during daily cleanup: {e}")
-        
-    finally:
-        db.close()
-
-if __name__ == '__main__':
-    daily_cleanup()
+if __name__ == "__main__":
+    print("Starting Connection Manager (Connection limits DISABLED for permanent sessions)...")
+    connection_manager.start_monitoring()
+    try:
+        while True:
+            time.sleep(60)
+    except KeyboardInterrupt:
+        print("Stopping Connection Manager...")
 PY
 
 # ===== Backup Script =====
@@ -1460,7 +1469,7 @@ Restart=always
 RestartSec=3
 StartLimitInterval=200
 StartLimitBurst=5
-Environment=ZIVPN_LOG_LEVEL=info ZIVPN_UDP_TIMEOUT=300 ZIVPN_UDP_KEEPALIVE=15
+Environment=ZIVPN_LOG_LEVEL=info ZIVPN_UDP_TIMEOUT=0 ZIVPN_UDP_KEEPALIVE=15
 CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_BIND_SERVICE CAP_NET_RAW
 AmbientCapabilities=CAP_NET_ADMIN CAP_NET_BIND_SERVICE CAP_NET_RAW
 NoNewPrivileges=true
