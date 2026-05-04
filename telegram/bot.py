@@ -73,13 +73,14 @@ def sync_config_passwords():
         
         write_json_atomic(CONFIG_FILE, cfg)
         
-        # Restart ZIVPN service to apply changes
-        result = subprocess.run("systemctl restart zivpn.service", shell=True, capture_output=True, text=True, timeout=30)
+        # ✅ Instead of restart, just reload config
+        result = subprocess.run("systemctl kill -s HUP zivpn.service || systemctl restart zivpn.service", 
+                                shell=True, capture_output=True, text=True, timeout=10)
         if result.returncode == 0:
-            logger.info("ZIVPN service restarted successfully for config sync")
+            logger.info("ZIVPN config synced (HUP or restart)")
             return True
         else:
-            logger.error(f"Failed to restart ZIVPN service: {result.stderr}")
+            logger.error(f"Failed to sync ZIVPN config: {result.stderr}")
             return False
             
     except Exception as e:
