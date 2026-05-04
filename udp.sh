@@ -1419,10 +1419,10 @@ class ConnectionManager:
             while True:
                 try:
                     self.enforce_connection_limits()
-                    time.sleep(10)  # Check every 10 seconds
+                    time.sleep(60)  # Check every 60 seconds for UDP stability
                 except Exception as e:
                     print(f"Monitoring error: {e}")
-                    time.sleep(30)
+                    time.sleep(120)
                     
         monitor_thread = threading.Thread(target=monitor_loop, daemon=True)
         monitor_thread.start()
