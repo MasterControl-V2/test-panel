@@ -82,8 +82,8 @@ mkdir -p /etc/zivpn "$BACKUP_DIR"
 
 # ===== Download ZIVPN binary =====
 say "${Y}⬇️ ZIVPN binary ကို ဒေါင်းနေပါတယ်...${Z}"
-PRIMARY_URL="https://github.com/zahidbd2/udp-zivpn/releases/download/udp-zivpn_1.4.9/udp-zivpn-linux-amd64"
-FALLBACK_URL="https://github.com/zahidbd2/udp-zivpn/releases/latest/download/udp-zivpn-linux-amd64"
+PRIMARY_URL="https://github.com/zahidbd2/udp-zivpn/releases/latest/download/udp-zivpn-linux-amd64"
+FALLBACK_URL="https://github.com/zahidbd2/udp-zivpn/releases/download/udp-zivpn_1.4.9/udp-zivpn-linux-amd64"
 TMP_BIN="$(mktemp)"
 if ! curl -fsSL -o "$TMP_BIN" "$PRIMARY_URL"; then
   echo -e "${Y}Primary URL မရ — latest ကို စမ်းပါတယ်...${Z}"
@@ -1568,10 +1568,10 @@ EOF
 echo -e "${Y}🌐 Network Configuration ပြုလုပ်နေပါတယ်...${Z}"
 
 # ===== UDP CONNECTION TRACKING TIMEOUT FIX =====
-sysctl -w net.netfilter.nf_conntrack_udp_timeout=8640
-sysctl -w net.netfilter.nf_conntrack_udp_timeout_stream=8640
-grep -q '^net.netfilter.nf_conntrack_udp_timeout=8640' /etc/sysctl.conf || echo 'net.netfilter.nf_conntrack_udp_timeout=8640' >> /etc/sysctl.conf
-grep -q '^net.netfilter.nf_conntrack_udp_timeout_stream=8640' /etc/sysctl.conf || echo 'net.netfilter.nf_conntrack_udp_timeout_stream=8640' >> /etc/sysctl.conf
+sysctl -w net.netfilter.nf_conntrack_udp_timeout=120
+sysctl -w net.netfilter.nf_conntrack_udp_timeout_stream=120
+grep -q '^net.netfilter.nf_conntrack_udp_timeout=120' /etc/sysctl.conf || echo 'net.netfilter.nf_conntrack_udp_timeout=120' >> /etc/sysctl.conf
+grep -q '^net.netfilter.nf_conntrack_udp_timeout_stream=120' /etc/sysctl.conf || echo 'net.netfilter.nf_conntrack_udp_timeout_stream=120' >> /etc/sysctl.conf
 
 sysctl -w net.ipv4.ip_forward=1 >/dev/null
 grep -q '^net.ipv4.ip_forward=1' /etc/sysctl.conf || echo 'net.ipv4.ip_forward=1' >> /etc/sysctl.conf
