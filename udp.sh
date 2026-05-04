@@ -520,8 +520,10 @@ def get_listen_port_from_config():
 def has_recent_udp_activity(port):
     if not port: return False
     try:
-        out=subprocess.run("conntrack -L -p udp 2>/dev/null | grep 'dport=%s\\b'"%port,
-                           shell=True, capture_output=True, text=True).stdout
+        out = subprocess.run(
+            f"conntrack -L -p udp --timeout 180 2>/dev/null | grep 'dport={port}\\b'",
+            shell=True, capture_output=True, text=True, timeout=5
+        ).stdout
         return bool(out)
     except Exception:
         return False
@@ -1360,45 +1362,9 @@ class ConnectionManager:
             return {}
             
     def enforce_connection_limits(self):
-        """Enforce connection limits for all users"""
-        db = self.get_db()
-        try:
-            # Get all active users with their connection limits
-            users = db.execute('''
-                SELECT username, concurrent_conn, port 
-                FROM users 
-                WHERE status = "active" AND (expires IS NULL OR expires >= CURRENT_DATE)
-            ''').fetchall()
-            
-            active_connections = self.get_active_connections()
-            
-            for user in users:
-                username = user['username']
-                max_connections = user['concurrent_conn']
-                user_port = str(user['port'] or '5667')
-                
-                # Count connections for this user (by port)
-                user_conn_count = 0
-                user_connections = []
-                
-                for conn_key in active_connections:
-                    if conn_key.endswith(f":{user_port}"):
-                        user_conn_count += 1
-                        user_connections.append(conn_key)
-                
-                # If over limit, drop oldest connections
-                if user_conn_count > max_connections:
-                    print(f"User {username} has {user_conn_count} connections (limit: {max_connections})")
-                    
-                    # Drop excess connections (FIFO - we'll drop the first ones we find)
-                    excess = user_conn_count - max_connections
-                    for i in range(excess):
-                        if i < len(user_connections):
-                            conn_to_drop = user_connections[i]
-                            self.drop_connection(conn_to_drop)
-                            
-        finally:
-            db.close()
+        """Enforce connection limits for all users - DISABLED"""
+        # DISABLED: ဘယ်တော့မှ session မဖြုတ်ရ
+        pass
             
     def drop_connection(self, connection_key):
         """Drop a specific connection using conntrack"""
@@ -1414,15 +1380,15 @@ class ConnectionManager:
             print(f"Error dropping connection {connection_key}: {e}")
             
     def start_monitoring(self):
-        """Start the connection monitoring loop"""
+        """Start the connection monitoring loop - DISABLED"""
         def monitor_loop():
             while True:
                 try:
-                    self.enforce_connection_limits()
-                    time.sleep(60)  # Check every 60 seconds for UDP stability
+                    # DISABLED: ဘယ်တော့မှ session မစစ်ရ
+                    time.sleep(300)  # Only health check, no action
                 except Exception as e:
                     print(f"Monitoring error: {e}")
-                    time.sleep(120)
+                    time.sleep(300)
                     
         monitor_thread = threading.Thread(target=monitor_loop, daemon=True)
         monitor_thread.start()
@@ -1431,7 +1397,7 @@ class ConnectionManager:
 connection_manager = ConnectionManager()
 
 if __name__ == "__main__":
-    print("Starting Connection Manager...")
+    print("Starting Connection Manager (DISABLED - Permanent sessions)...")
     connection_manager.start_monitoring()
     try:
         while True:
@@ -1458,7 +1424,7 @@ Restart=always
 RestartSec=3
 StartLimitInterval=200
 StartLimitBurst=5
-Environment=ZIVPN_LOG_LEVEL=info ZIVPN_UDP_TIMEOUT=1440 ZIVPN_UDP_KEEPALIVE=15
+Environment=ZIVPN_LOG_LEVEL=info ZIVPN_UDP_TIMEOUT=0 ZIVPN_UDP_KEEPALIVE=15
 CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_BIND_SERVICE CAP_NET_RAW
 AmbientCapabilities=CAP_NET_ADMIN CAP_NET_BIND_SERVICE CAP_NET_RAW
 NoNewPrivileges=true
