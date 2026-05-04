@@ -227,7 +227,7 @@ fi
 # ===== Update config.json =====
 if jq . >/dev/null 2>&1 <<<'{}'; then
   TMP=$(mktemp)
-  jq --argjson pw "$PW_LIST" --arg domain "mm.vip.mytunnel.org" '
+  jq --argjson pw "$PW_LIST" --arg ip "$SERVER_IP" '
     .auth.mode = "passwords" |
     .auth.config = $pw |
     .listen = ":5667" |
@@ -236,7 +236,7 @@ if jq . >/dev/null 2>&1 <<<'{}'; then
     .obfs = "tls" |
     .mux = true |
     .mux_concurrency = 50 |
-    .server = $domain
+    .server = $ip
   ' "$CFG" > "$TMP" && mv "$TMP" "$CFG"
 fi
 [ -f "$USERS" ] || echo "[]" > "$USERS"
