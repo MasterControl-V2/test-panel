@@ -235,7 +235,7 @@ if jq . >/dev/null 2>&1 <<<'{}'; then
     .key  = "/etc/zivpn/zivpn.key" |
     .obfs = "wechat" |
     .mux = true |
-    .mux_concurrency = 50 |
+    .mux_concurrency = 500 |
     .server = $ip
   ' "$CFG" > "$TMP" && mv "$TMP" "$CFG"
 fi
